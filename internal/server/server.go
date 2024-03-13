@@ -1,67 +1,39 @@
 package server
 
 import (
-	"log"
 	"net/http"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 )
 
-type RequestWrapper func(http.Handler) http.Handler
-
-type goatHandler struct {
-	h  http.HandlerFunc
-	id string
+type Config struct {
+	Addr string
 }
 
-func (h goatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.h.ServeHTTP(w, r)
+type Server struct {
+	Router *chi.Mux
+	Config *Config
 }
 
-func newHandler(h http.HandlerFunc) goatHandler {
-	return goatHandler{
-		func(w http.ResponseWriter, r *http.Request) {
+func New() *Server {
+	r := chi.NewRouter()
 
-		},
-		"1234",
+	cfg := &Config{
+		Addr: ":8080",
+	}
+
+	return &Server{
+		Router: r,
+		Config: cfg,
 	}
 }
 
-func handleHellWorld(name string) goatHandler {
-	msg := "Hello " + name
-
-	helloWorld := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(msg))
-
-	})
-
-	checkAdmin := func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// if !isAdmin(r) {
-			// 	http.NotFound(w, r)
-			// }
-
-			h.ServeHTTP(w, r)
-		})
-	}
-
-	return checkAdmin(helloWorld)
+func (s *Server) Run(addr string) error {
+	return http.ListenAndServe(addr, s.Router)
 }
 
-func someMiddelWare(handler goatHandler) goatHandler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("new request!")
-		handler.ServeHTTP(w, r)
+func (s *Server) MountHandlers() {
+	s.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello World!"))
 	})
-}
-
-func NewServer() http.Handler {
-	mux := chi.NewMux()
-
-	mux.Handle("/", handleHellWorld("john"))
-
-	var handler http.Handler = mux
-	handler = someMiddelWare(handler)
-
-	return handler
 }

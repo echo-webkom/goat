@@ -2,58 +2,52 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
+	"syscall"
 	"time"
 
 	"github.com/echo-webkom/goat/internal/server"
 )
 
-const (
-	HOST string = ""
-	PORT string = "3000"
-)
+func main() {
+	s := server.New()
+	s.MountHandlers()
 
-func run(ctx context.Context, w io.Writer, args []string) error {
-	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
-	defer cancel()
-
-	srv := server.NewServer()
-	httpServer := &http.Server{
-		Addr:    net.JoinHostPort(HOST, PORT),
-		Handler: srv,
+	server := &http.Server{
+		Addr:    s.Config.Addr,
+		Handler: s.Router,
 	}
 
+	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
-		log.Printf("listening on %s\n", httpServer.Addr)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
+		<-sig
+
+		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second)
+
+		go func() {
+			<-shutdownCtx.Done()
+			if shutdownCtx.Err() == context.DeadlineExceeded {
+				log.Fatal("graceful shutdown timed out.. forcing exit.")
+			}
+		}()
+
+		err := server.Shutdown(shutdownCtx)
+		if err != nil {
+			log.Fatal(err)
 		}
+		serverStopCtx()
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		<-ctx.Done()
-		// make a new context for the Shutdown (thanks Alessandro Rosetti)
-		shutdownCtx := context.Background()
-		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			fmt.Fprintf(os.Stderr, "error shutting down http server: %s\n", err)
-		}
-	}()
-	wg.Wait()
-	return nil
-}
+	err := server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 
-func main() {
-	log.Fatal(run(context.Background(), os.Stderr, os.Args))
+	<-serverCtx.Done()
 }
