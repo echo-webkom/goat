@@ -34,10 +34,12 @@ func (s *Server) Run(addr string) error {
 
 func (s *Server) MountHandlers() {
 
+	// Create simple base handler using a context
 	handler := NewHandler(func(hwc HandlerWithCtx) {
-		hwc.w.Write([]byte("Hello " + hwc.name))
+		hwc.res.Write([]byte("Hello " + hwc.name))
 	})
 
+	// Create middleware that writes to the context before calling the handler
 	middleware := NewMiddleware(func(hf HandlerFunc) HandlerFunc {
 		return func(hwc HandlerWithCtx) {
 			hwc.name = "John"
