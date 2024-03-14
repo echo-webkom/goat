@@ -32,5 +32,5 @@ func TestHelloWorld(t *testing.T) {
 
 	checkResponseCode(t, http.StatusOK, response.Code)
 
-	require.Equal(t, "Hello World!", response.Body.String())
+	require.Equal(t, "Hello John", response.Body.String())
 }
