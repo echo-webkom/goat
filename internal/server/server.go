@@ -33,7 +33,17 @@ func (s *Server) Run(addr string) error {
 }
 
 func (s *Server) MountHandlers() {
-	s.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World!"))
+
+	handler := NewHandler(func(hwc HandlerWithCtx) {
+		hwc.w.Write([]byte("Hello " + hwc.name))
 	})
+
+	middleware := NewMiddleware(func(hf HandlerFunc) HandlerFunc {
+		return func(hwc HandlerWithCtx) {
+			hwc.name = "John"
+			hf(hwc)
+		}
+	})
+
+	s.Router.Get("/", ToHttpHandler(middleware(handler)))
 }
