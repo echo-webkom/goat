@@ -33,7 +33,19 @@ func (s *Server) Run(addr string) error {
 }
 
 func (s *Server) MountHandlers() {
-	s.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World!"))
+
+	// Create simple base handler using a context
+	handler := NewHandler(func(hwc HandlerWithCtx) {
+		hwc.res.Write([]byte("Hello " + hwc.name))
 	})
+
+	// Create middleware that writes to the context before calling the handler
+	middleware := NewMiddleware(func(hf HandlerFunc) HandlerFunc {
+		return func(hwc HandlerWithCtx) {
+			hwc.name = "John"
+			hf(hwc)
+		}
+	})
+
+	s.Router.Get("/", ToHttpHandler(middleware(handler)))
 }
