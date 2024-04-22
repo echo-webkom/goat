@@ -3,22 +3,22 @@ package server
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/echo-webkom/goat/internal/auth/sample"
 )
+
+type Server struct {
+	Router *http.ServeMux
+	Config Config
+}
 
 type Config struct {
 	Addr string
 }
 
-type Server struct {
-	Router *chi.Mux
-	Config *Config
-}
-
 func New() *Server {
-	r := chi.NewRouter()
+	r := http.NewServeMux()
 
-	cfg := &Config{
+	cfg := Config{
 		Addr: ":8080",
 	}
 
@@ -47,5 +47,8 @@ func (s *Server) MountHandlers() {
 		}
 	})
 
-	s.Router.Get("/", ToHttpHandlerFunc(middleware(handler)))
+	s.Router.Handle("GET /test", ToHttpHandlerFunc(middleware(handler)))
+
+	// Sample oauth2 flow, go to /sample_login
+	sample.New(s.Router)
 }

@@ -1,6 +1,6 @@
 module github.com/echo-webkom/goat
 
-go 1.21.1
+go 1.22.1
 
 require github.com/markbates/goth v1.79.0
 
