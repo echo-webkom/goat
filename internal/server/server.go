@@ -3,22 +3,22 @@ package server
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/echo-webkom/goat/internal/auth/sample"
 )
+
+type Server struct {
+	Router *http.ServeMux
+	Config Config
+}
 
 type Config struct {
 	Addr string
 }
 
-type Server struct {
-	Router *chi.Mux
-	Config *Config
-}
-
 func New() *Server {
-	r := chi.NewRouter()
+	r := http.NewServeMux()
 
-	cfg := &Config{
+	cfg := Config{
 		Addr: ":8080",
 	}
 
@@ -35,17 +35,20 @@ func (s *Server) Run(addr string) error {
 func (s *Server) MountHandlers() {
 
 	// Create simple base handler using a context
-	handler := NewHandler(func(hwc HandlerWithCtx) {
-		hwc.res.Write([]byte("Hello " + hwc.name))
+	handler := NewHandler(func(ctx Context) {
+		ctx.res.Write([]byte("Hello " + ctx.name))
 	})
 
-	// Create middleware that writes to the context before calling the handler
+	// Create myMiddleware that writes to the context before calling the handler
 	middleware := NewMiddleware(func(hf HandlerFunc) HandlerFunc {
-		return func(hwc HandlerWithCtx) {
-			hwc.name = "John"
-			hf(hwc)
+		return func(ctx Context) {
+			ctx.name = "John"
+			hf(ctx)
 		}
 	})
 
-	s.Router.Get("/", ToHttpHandler(middleware(handler)))
+	s.Router.Handle("GET /test", ToHttpHandlerFunc(middleware(handler)))
+
+	// Sample oauth2 flow, go to /sample_login
+	sample.New(s.Router)
 }
