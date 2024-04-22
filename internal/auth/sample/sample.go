@@ -3,7 +3,6 @@ package sample
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,7 +26,7 @@ func resJson(w http.ResponseWriter, j any) {
 func mountExampleHandlers(s *http.ServeMux) {
 	// Example login page, will be replaced with provider URL
 	s.HandleFunc("GET /sample/auth", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "test/pages/sample_auth.html")
+		http.ServeFile(w, r, "internal/auth/sample/sample_auth.html")
 	})
 
 	// Used for token exchange
@@ -121,7 +120,6 @@ func callback(config oauth2.Config) http.HandlerFunc {
 			return
 		}
 
-		fmt.Println(string(userData))
 		w.Write(userData)
 	}
 }
