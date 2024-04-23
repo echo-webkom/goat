@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 
+	"github.com/echo-webkom/goat/internal/auth"
 	"github.com/echo-webkom/goat/internal/auth/sample"
 )
 
@@ -49,6 +51,16 @@ func (s *Server) MountHandlers() {
 
 	s.Router.Handle("GET /test", ToHttpHandlerFunc(middleware(handler)))
 
-	// Sample oauth2 flow, go to /sample_login
-	sample.New(s.Router)
+	// Sample oauth2 flow, go to /auth/sample
+	ps := map[string]auth.Provider{
+		"sample": sample.New(),
+	}
+
+	s.Router.HandleFunc("/auth/{provider}", auth.LoginHandler(ps))
+	s.Router.HandleFunc("/auth/{provider}/callback", auth.CallbackHandler(ps, func(s auth.Session) {
+		d, _ := json.Marshal(s.User)
+		s.Writer.Write(d)
+	}))
+
+	sample.MountExampleHandlers(s.Router)
 }
