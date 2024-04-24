@@ -24,7 +24,7 @@ func (r *happeningRepo) Get(id string) (*domain.User, error) {
 	row := r.db.QueryRow(context.TODO(), sql, id)
 
 	var user domain.User
-	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.EmilVerified, &user.Image, &user.AlternativeEmail, &user.DegreeID, &user.Year, &user.Type, &user.IsBanned, &user.BannedFromStrike)
+	err := row.Scan(&user.ID, &user.Name, &user.Email, &user.EmailVerified, &user.Image, &user.AlternativeEmail, &user.DegreeID, &user.Year, &user.Type, &user.IsBanned, &user.BannedFromStrike)
 	if err != nil {
 		return nil, err
 	}

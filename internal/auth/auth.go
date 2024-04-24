@@ -2,58 +2,65 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 
+	"github.com/echo-webkom/goat/internal/domain"
 	"golang.org/x/oauth2"
 )
 
+type UserFetcher func(*oauth2.Token) (domain.User, error)
+
 type Provider struct {
+	name   string
 	config oauth2.Config
+
+	// Given as an argument when calling auth.New(). getuser should
+	// fetch user data from the provider using the given token and
+	// return a User struct.
+	getUser UserFetcher
 }
 
-func New(clientId, clientSecret, authUrl, tokenUrl string) Provider {
-	config := oauth2.Config{
-		// Default auth callback for testing. Remove
-		RedirectURL:  "http://localhost:8080/auth/{provider}/callback",
-		ClientID:     clientId,
-		ClientSecret: clientSecret,
-		Scopes:       []string{},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  authUrl,
-			TokenURL: tokenUrl,
+// New creates a new provider with oauth config
+func New(
+	providerName,
+	clientId,
+	clientSecret,
+	authUrl,
+	tokenUrl string,
+	scopes []string,
+	getUser UserFetcher,
+) Provider {
+
+	callbackUrl := "http://localhost:8080/auth/" + providerName + "/callback"
+	return Provider{
+		config: oauth2.Config{
+			RedirectURL:  callbackUrl,
+			ClientID:     clientId,
+			ClientSecret: clientSecret,
+			Scopes:       []string{},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  authUrl,
+				TokenURL: tokenUrl,
+			},
 		},
+		name:    providerName,
+		getUser: getUser,
 	}
-
-	return Provider{config: config}
 }
 
-type User struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token"`
-	Scope        string `json:"scope"`
-	Error        string `json:"error"`
-	ErrorDesc    string `json:"error_description"`
-	ErrorUri     string `json:"error_uri"`
-}
-
-type Session struct {
-	User    User
-	Writer  http.ResponseWriter
-	Request *http.Request
-}
-
-// LoginHandler return a http.HandlerFunc used to handle the endpoint /auth/{provider}
-func LoginHandler(providers map[string]Provider) http.HandlerFunc {
+// BeginAuthHandler handles the endpoint /auth/{provider}
+// Redirects the user to the providers auth page.
+func BeginAuthHandler(providers map[string]Provider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		providerName := r.PathValue("provider")
+
 		if p, ok := providers[providerName]; ok {
-			url := p.config.AuthCodeURL("randomstate")
+			// Todo: set state cookie
+			// Todo: add random state
+			url := p.config.AuthCodeURL("abcdefppabcdefppabcdefppabcdefpp")
 			http.Redirect(w, r, url, http.StatusSeeOther)
+
 		} else {
 			log.Println("login: provider not found: ", providerName)
 			w.WriteHeader(http.StatusNotFound)
@@ -61,49 +68,34 @@ func LoginHandler(providers map[string]Provider) http.HandlerFunc {
 	}
 }
 
-// CallbackHandler returns a http.HandlerFunc used to handle the endpoint /auth/{provider}/callback
-func CallbackHandler(providers map[string]Provider, userCallback func(Session)) http.HandlerFunc {
+// CallbackHandler handles the endpoint /auth/{provider}/callback.
+func CallbackHandler(providers map[string]Provider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		providerName := r.PathValue("provider")
-
-		if p, ok := providers[providerName]; ok {
-			userData, err := p.fetchUserData(r)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
-			var user User
-			if err = json.Unmarshal(userData, &user); err != nil {
-				log.Println(err)
-				return
-			}
-
-			userCallback(Session{
-				User:    user,
-				Request: r,
-				Writer:  w,
-			})
-		} else {
-			log.Println("callback: provider not found: ", providerName)
+		p, ok := providers[r.PathValue("provider")]
+		if !ok {
 			w.WriteHeader(http.StatusNotFound)
+			return
 		}
+
+		// Todo: compare state
+
+		code := r.FormValue("code")
+		token, err := p.config.Exchange(context.Background(), code)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		user, err := p.getUser(token)
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		AsAuthenticatedUser(user)
 	}
 }
 
-func (p *Provider) fetchUserData(r *http.Request) ([]byte, error) {
-	code := r.FormValue("code")
-
-	token, err := p.config.Exchange(context.Background(), code)
-	if err != nil {
-		return nil, err
-	}
-
-	token_url := p.config.Endpoint.TokenURL + "?access_token=" + token.AccessToken
-	resp, err := http.Get(token_url)
-	if err != nil {
-		return nil, err
-	}
-
-	return io.ReadAll(resp.Body)
+func AsAuthenticatedUser(user domain.User) {
+	// ... do stuff with user
 }

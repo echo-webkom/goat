@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/echo-webkom/goat/internal/auth"
+	"github.com/echo-webkom/goat/internal/domain"
+	"golang.org/x/oauth2"
 )
 
 func resJson(w http.ResponseWriter, j any) {
@@ -48,9 +50,14 @@ func MountExampleHandlers(s *http.ServeMux) {
 
 func New() auth.Provider {
 	return auth.New(
-		"cooluserid",
-		"coolusersecret",
+		"sample",
+		"client_id",
+		"client_secret",
 		"http://localhost:8080/sample/auth",
 		"http://localhost:8080/sample/tokenUrl",
+		[]string{},
+		func(t *oauth2.Token) (u domain.User, e error) {
+			return u, e
+		},
 	)
 }
