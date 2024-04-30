@@ -1,47 +1,42 @@
 package providers
 
 import (
-	"net/http"
+	"os"
 
-	"github.com/markbates/goth"
+	"github.com/echo-webkom/goat/internal/auth"
+	"github.com/echo-webkom/goat/internal/domain"
 	"golang.org/x/oauth2"
 )
 
-const (
-	authURL      string = "https://discord.com/api/oauth2/authorize"
-	tokenURL     string = "https://discord.com/api/oauth2/token"
-	userEndpoint string = "https://discord.com/api/users/@me"
-)
+func Feide() auth.Provider {
+	const (
+		authUrl  = ""
+		tokenUrl = ""
+		userUrl  = ""
 
-const (
-	ScopeEmail   = "email"
-	ScopeOpenID  = "openid"
-	ScopeProfile = "profile"
-	ScopeGroups  = "groups"
-)
+		scopeEmail   = "email"
+		scopeOpenID  = "openid"
+		scopeProfile = "profile"
+		scopeGroups  = "groups"
+	)
 
-type Provider struct {
-	ClientKey    string
-	Secret       string
-	CallbackURL  string
-	HTTPClient   *http.Client
-	config       *oauth2.Config
-	providerName string
-	permissions  string
-}
+	getUser := func(token *oauth2.Token) (user domain.User, err error) {
 
-func (p *Provider) Name() string {
-	return p.providerName
-}
+		return user, err
+	}
 
-func (p *Provider) SetName(name string) {
-	p.providerName = name
-}
-
-func (p *Provider) SetPermissions(permissions string) {
-	p.permissions = permissions
-}
-
-func (p *Provider) Client() *http.Client {
-	return goth.HTTPClientWithFallBack(p.HTTPClient)
+	return auth.New(
+		"feide",
+		os.Getenv("FEIDE_CLIENT_ID"),
+		os.Getenv("FEIDE_CLIENT_SECRET"),
+		authUrl,
+		tokenUrl,
+		[]string{
+			scopeProfile,
+			scopeOpenID,
+			scopeEmail,
+			scopeGroups,
+		},
+		getUser,
+	)
 }

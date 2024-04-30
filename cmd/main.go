@@ -11,9 +11,12 @@ import (
 	"time"
 
 	"github.com/echo-webkom/goat/internal/server"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	godotenv.Load() // Debug
+
 	s := server.New()
 	s.MountHandlers()
 
