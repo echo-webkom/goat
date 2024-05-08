@@ -32,6 +32,7 @@ func (s *Server) Run(addr string) error {
 func (s *Server) MountHandlers() {
 	ps := map[string]auth.Provider{
 		"github": providers.Github(),
+		"feide":  providers.Feide(),
 	}
 
 	s.Router.HandleFunc("/auth/{provider}", auth.BeginAuthHandler(ps))

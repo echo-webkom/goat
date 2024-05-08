@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"log"
 	"os"
 
 	"github.com/echo-webkom/goat/internal/auth"
@@ -10,9 +11,9 @@ import (
 
 func Feide() auth.Provider {
 	const (
-		authUrl  = ""
-		tokenUrl = ""
-		userUrl  = ""
+		authUrl  = "https://auth.dataporten.no/oauth/authorization"
+		tokenUrl = "https://auth.dataporten.no/oauth/token"
+		userUrl  = "https://auth.dataporten.no/openid/userinfo"
 
 		scopeEmail   = "email"
 		scopeOpenID  = "openid"
@@ -21,6 +22,8 @@ func Feide() auth.Provider {
 	)
 
 	getUser := func(token *oauth2.Token) (user domain.User, err error) {
+
+		log.Println("yay")
 
 		return user, err
 	}

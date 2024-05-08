@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -56,9 +58,20 @@ func BeginAuthHandler(providers map[string]Provider) http.HandlerFunc {
 		providerName := r.PathValue("provider")
 
 		if p, ok := providers[providerName]; ok {
-			// Todo: set state cookie
-			// Todo: add random state
-			url := p.config.AuthCodeURL("abcdefppabcdefppabcdefppabcdefpp")
+			b := make([]byte, 32+2)
+			rand.Read(b)
+			state := fmt.Sprintf("%x", b)[2 : 32+2]
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     "state",
+				Value:    state,
+				Secure:   true,
+				HttpOnly: true,
+				Path:     "/",
+				SameSite: http.SameSiteLaxMode,
+			})
+
+			url := p.config.AuthCodeURL(state)
 			http.Redirect(w, r, url, http.StatusSeeOther)
 
 		} else {
@@ -74,21 +87,54 @@ func CallbackHandler(providers map[string]Provider) http.HandlerFunc {
 		p, ok := providers[r.PathValue("provider")]
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
+			log.Println("callback: provider not found")
 			return
 		}
 
-		// Todo: compare state
+		cookie, err := r.Cookie("state")
+		if err != nil {
+			log.Println("callback: state cookie not found")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
-		code := r.FormValue("code")
+		if r.URL.Query().Get("state") != cookie.Value {
+			log.Println("callback: state cookie mismatch")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// Welcome to "guess how the provider gives you the code"
+		guesses := []string{
+			r.FormValue("code"),
+			r.URL.Query().Get("code"),
+		}
+
+		code := ""
+		for _, c := range guesses {
+			if c != "" {
+				code = c
+				break
+			}
+		}
+
+		if code == "" {
+			log.Println("callback: couldnt get code")
+		}
+
 		token, err := p.config.Exchange(context.Background(), code)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
+			log.Println(err)
+			log.Println("callback: token exchange failed")
 			return
 		}
 
 		user, err := p.getUser(token)
 		if err != nil {
 			w.WriteHeader(http.StatusNotFound)
+			log.Println(err)
+			log.Println("callback: failed to get user")
 			return
 		}
 
@@ -97,5 +143,6 @@ func CallbackHandler(providers map[string]Provider) http.HandlerFunc {
 }
 
 func AsAuthenticatedUser(user domain.User) {
+	log.Println("authenticated as user")
 	// ... do stuff with user
 }
