@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/echo-webkom/goat/internal/server"
+	"github.com/echo-webkom/goat/server"
 	"github.com/joho/godotenv"
 )
 

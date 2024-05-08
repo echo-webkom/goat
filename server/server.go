@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
-	"github.com/echo-webkom/goat/internal/auth"
-	"github.com/echo-webkom/goat/internal/auth/providers"
+	"github.com/echo-webkom/goat/auth"
+	"github.com/echo-webkom/goat/providers"
 )
 
 type Server struct {

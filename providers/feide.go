@@ -1,12 +1,9 @@
 package providers
 
 import (
-	"log"
 	"os"
 
-	"github.com/echo-webkom/goat/internal/auth"
-	"github.com/echo-webkom/goat/internal/domain"
-	"golang.org/x/oauth2"
+	"github.com/echo-webkom/goat/auth"
 )
 
 func Feide() auth.Provider {
@@ -21,13 +18,6 @@ func Feide() auth.Provider {
 		scopeGroups  = "groups"
 	)
 
-	getUser := func(token *oauth2.Token) (user domain.User, err error) {
-
-		log.Println("yay")
-
-		return user, err
-	}
-
 	return auth.New(
 		"feide",
 		os.Getenv("FEIDE_CLIENT_ID"),
@@ -40,6 +30,5 @@ func Feide() auth.Provider {
 			scopeEmail,
 			scopeGroups,
 		},
-		getUser,
 	)
 }

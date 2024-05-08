@@ -7,20 +7,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/echo-webkom/goat/internal/domain"
 	"golang.org/x/oauth2"
 )
 
-type UserFetcher func(*oauth2.Token) (domain.User, error)
+type UserFetcher func(*oauth2.Token) error
 
 type Provider struct {
 	name   string
 	config oauth2.Config
-
-	// Given as an argument when calling auth.New(). getuser should
-	// fetch user data from the provider using the given token and
-	// return a User struct.
-	getUser UserFetcher
 }
 
 // New creates a new provider with oauth config
@@ -31,7 +25,6 @@ func New(
 	authUrl,
 	tokenUrl string,
 	scopes []string,
-	getUser UserFetcher,
 ) Provider {
 
 	callbackUrl := "http://localhost:8080/auth/" + providerName + "/callback"
@@ -46,8 +39,7 @@ func New(
 				TokenURL: tokenUrl,
 			},
 		},
-		name:    providerName,
-		getUser: getUser,
+		name: providerName,
 	}
 }
 
@@ -130,19 +122,11 @@ func CallbackHandler(providers map[string]Provider) http.HandlerFunc {
 			return
 		}
 
-		user, err := p.getUser(token)
-		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			log.Println(err)
-			log.Println("callback: failed to get user")
-			return
-		}
-
-		AsAuthenticatedUser(user)
+		AsAuthenticatedUser(token)
 	}
 }
 
-func AsAuthenticatedUser(user domain.User) {
+func AsAuthenticatedUser(token *oauth2.Token) {
 	log.Println("authenticated as user")
 	// ... do stuff with user
 }
