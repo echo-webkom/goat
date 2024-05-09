@@ -3,14 +3,13 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 
 	"golang.org/x/oauth2"
 )
-
-type UserFetcher func(*oauth2.Token) error
 
 type Provider struct {
 	name   string
@@ -83,50 +82,59 @@ func CallbackHandler(providers map[string]Provider) http.HandlerFunc {
 			return
 		}
 
-		cookie, err := r.Cookie("state")
+		if err := compareState(r); err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		code, err := getCode(r)
 		if err != nil {
-			log.Println("callback: state cookie not found")
 			w.WriteHeader(http.StatusBadRequest)
+			log.Println(err)
 			return
-		}
-
-		if r.URL.Query().Get("state") != cookie.Value {
-			log.Println("callback: state cookie mismatch")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		// Welcome to "guess how the provider gives you the code"
-		guesses := []string{
-			r.FormValue("code"),
-			r.URL.Query().Get("code"),
-		}
-
-		code := ""
-		for _, c := range guesses {
-			if c != "" {
-				code = c
-				break
-			}
-		}
-
-		if code == "" {
-			log.Println("callback: couldnt get code")
 		}
 
 		token, err := p.config.Exchange(context.Background(), code)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Println(err)
-			log.Println("callback: token exchange failed")
+			log.Printf("callback: token exchange failed: %s\n", err.Error())
 			return
 		}
 
-		AsAuthenticatedUser(token)
+		AsAuthenticatedUser(p, token)
 	}
 }
 
-func AsAuthenticatedUser(token *oauth2.Token) {
+func AsAuthenticatedUser(provider Provider, token *oauth2.Token) {
 	log.Println("authenticated as user")
-	// ... do stuff with user
+	// Todo: respond with jwt of oauth token
+}
+
+func compareState(r *http.Request) error {
+	cookie, err := r.Cookie("state")
+	if err != nil {
+		return errors.New("state cookie not found")
+	}
+
+	if r.URL.Query().Get("state") != cookie.Value {
+		return errors.New("state mismatch")
+	}
+
+	return nil
+}
+
+func getCode(r *http.Request) (string, error) {
+	guesses := []string{
+		r.FormValue("code"),
+		r.URL.Query().Get("code"),
+	}
+
+	for _, c := range guesses {
+		if c != "" {
+			return c, nil
+		}
+	}
+
+	return "", errors.New("could not extract code from request")
 }
