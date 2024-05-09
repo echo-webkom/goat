@@ -1,40 +1,57 @@
 package server
 
 import (
+	"context"
+	"errors"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/echo-webkom/goat/auth"
 	"github.com/echo-webkom/goat/providers"
 )
 
-type Server struct {
-	Router *http.ServeMux
-	Config Config
-}
+func New() *http.Server {
+	mux := http.NewServeMux()
 
-type Config struct {
-	Addr string
-}
-
-func New() *Server {
-	return &Server{
-		Router: http.NewServeMux(),
-		Config: Config{
-			Addr: ":8080",
-		},
-	}
-}
-
-func (s *Server) Run(addr string) error {
-	return http.ListenAndServe(addr, s.Router)
-}
-
-func (s *Server) MountHandlers() {
 	ps := map[string]auth.Provider{
 		"github": providers.Github(),
 		"feide":  providers.Feide(),
 	}
 
-	s.Router.HandleFunc("/auth/{provider}", auth.BeginAuthHandler(ps))
-	s.Router.HandleFunc("/auth/{provider}/callback", auth.CallbackHandler(ps))
+	mux.HandleFunc("/auth/{provider}", auth.BeginAuthHandler(ps))
+	mux.HandleFunc("/auth/{provider}/callback", auth.CallbackHandler(ps))
+
+	return &http.Server{
+		Addr:    "8080",
+		Handler: mux,
+	}
+}
+
+func ServeWithShutdown(s *http.Server) {
+	log.Println("Listening at", s.Addr)
+
+	go func() {
+		if err := s.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+		log.Println("Stopped serving new connections. Shutting down...")
+	}()
+
+	// Handle interupt (ctrl-c etc) and gracefully shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownRelease()
+
+	if err := s.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("HTTP shutdown error: %v", err)
+	}
+
+	log.Println("Graceful shutdown complete.")
 }
