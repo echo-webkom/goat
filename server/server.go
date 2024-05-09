@@ -26,7 +26,7 @@ func New() *http.Server {
 	mux.HandleFunc("/auth/{provider}/callback", auth.CallbackHandler(ps))
 
 	return &http.Server{
-		Addr:    "8080",
+		Addr:    ":8080",
 		Handler: mux,
 	}
 }
