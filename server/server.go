@@ -25,6 +25,14 @@ func New() *http.Server {
 	mux.HandleFunc("/auth/{provider}", auth.BeginAuthHandler(ps))
 	mux.HandleFunc("/auth/{provider}/callback", auth.CallbackHandler(ps))
 
+	// Test
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "temp/auth.html")
+	})
+	mux.HandleFunc("/home", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "temp/home.html")
+	})
+
 	return &http.Server{
 		Addr:    ":8080",
 		Handler: mux,

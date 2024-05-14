@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
+	"github.com/golang-jwt/jwt"
 	"golang.org/x/oauth2"
 )
 
@@ -49,18 +51,14 @@ func BeginAuthHandler(providers map[string]Provider) http.HandlerFunc {
 		providerName := r.PathValue("provider")
 
 		if p, ok := providers[providerName]; ok {
+			// Make random state string
 			b := make([]byte, 32+2)
 			rand.Read(b)
 			state := fmt.Sprintf("%x", b)[2 : 32+2]
 
-			http.SetCookie(w, &http.Cookie{
-				Name:     "state",
-				Value:    state,
-				Secure:   true,
-				HttpOnly: true,
-				Path:     "/",
-				SameSite: http.SameSiteLaxMode,
-			})
+			setSecureCookie(w, "state", state)
+			// Todo: use other method maybe?
+			setSecureCookie(w, "origin", r.URL.Query().Get("origin"))
 
 			url := p.config.AuthCodeURL(state)
 			http.Redirect(w, r, url, http.StatusSeeOther)
@@ -102,13 +100,47 @@ func CallbackHandler(providers map[string]Provider) http.HandlerFunc {
 			return
 		}
 
-		AsAuthenticatedUser(p, token)
+		AsAuthenticatedUser(w, r, p, token)
 	}
 }
 
-func AsAuthenticatedUser(provider Provider, token *oauth2.Token) {
+func AsAuthenticatedUser(w http.ResponseWriter, r *http.Request, provider Provider, token *oauth2.Token) {
 	log.Println("authenticated as user")
-	// Todo: respond with jwt of oauth token
+
+	cookie, err := r.Cookie("origin")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+
+	signingKey := []byte(os.Getenv("JWT_KEY"))
+
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"token":    token.AccessToken,
+		"provider": provider.name,
+	})
+
+	str, err := tok.SignedString(signingKey)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	url := cookie.Value + "?jwt=" + str
+	http.Redirect(w, r, url, http.StatusSeeOther)
+}
+
+func setSecureCookie(w http.ResponseWriter, key, value string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     key,
+		Value:    value,
+		Secure:   true,
+		HttpOnly: true,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func compareState(r *http.Request) error {
